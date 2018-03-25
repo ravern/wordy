@@ -5,7 +5,36 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+
+	homedir "github.com/mitchellh/go-homedir"
 )
+
+type store struct {
+	file *os.File
+}
+
+func newStore(filename string) (*store, error) {
+	expandedFilename, err := homedir.Expand(filename)
+	if err != nil {
+		return nil, err
+	}
+	file, err := os.Create(expandedFilename)
+	if err != nil {
+		return nil, err
+	}
+
+	return &store{
+		file: file,
+	}, nil
+}
+
+func (s *store) add(word string, desc string, tags []string) error {
+	return nil
+}
+
+func (s *store) close() {
+	s.file.Close()
+}
 
 const (
 	commandAdd    = "add"
@@ -41,7 +70,7 @@ Flags:
 `
 	helpSearch = `Search existing words
 
-Usage: wordy remove
+Usage: wordy search
 
 Flags:
 	-file
@@ -64,6 +93,11 @@ type add struct {
 }
 
 func (add *add) run() {
+	_, err := newStore(add.filename)
+	if err != nil {
+		fmt.Printf("Error: %v\nFailed!\n", err)
+		os.Exit(1)
+	}
 }
 
 type search struct {
@@ -115,6 +149,7 @@ func main() {
 	addFlagSet.Usage = func() {
 		fmt.Println(helpAdd)
 	}
+	addFlagSet.StringVar(&add.filename, "file", "~/.wordy", "")
 
 	search := new(search)
 	searchFlagSet := flag.NewFlagSet(commandSearch, flag.ExitOnError)
