@@ -12,7 +12,11 @@ page.
 
 Alternatively, you can build it from source by installing the package
 ```bash
-$ go get github.com/ravernkoh/wordy
+$ go get -u github.com/ravernkoh/wordy
+
+# Also requires these packages
+$ go get -u github.com/mitchellh/go-homedir
+$ go get -u github.com/texttheater/golang-levenshtein/levenshtein
 ```
 
 Pre-defined word banks can be downloaded from this repository as well *(coming soon)*.
