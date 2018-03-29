@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -9,8 +10,14 @@ import (
 	homedir "github.com/mitchellh/go-homedir"
 )
 
+var (
+	errAlreadyExists = errors.New("store: word already exists")
+	errDoesntExist   = errors.New("store: word does not exist")
+)
+
 type store struct {
-	file *os.File
+	file    *os.File
+	entries []*entry
 }
 
 func newStore(filename string) (*store, error) {
@@ -18,7 +25,8 @@ func newStore(filename string) (*store, error) {
 	if err != nil {
 		return nil, err
 	}
-	file, err := os.Create(expandedFilename)
+
+	file, err := os.OpenFile(expandedFilename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		return nil, err
 	}
@@ -28,12 +36,26 @@ func newStore(filename string) (*store, error) {
 	}, nil
 }
 
-func (s *store) add(word string, desc string, tags []string) error {
+func (s *store) add(e *entry) error {
+	return nil
+}
+
+func (s *store) list() ([]*entry, error) {
+	return nil, nil
+}
+
+func (s *store) remove(e *entry) error {
 	return nil
 }
 
 func (s *store) close() {
 	s.file.Close()
+}
+
+type entry struct {
+	word string
+	desc string
+	tags []string
 }
 
 const (
@@ -93,9 +115,15 @@ type add struct {
 }
 
 func (add *add) run() {
-	_, err := newStore(add.filename)
+	store, err := newStore(add.filename)
 	if err != nil {
-		fmt.Printf("Error: %v\nFailed!\n", err)
+		fmt.Printf("\nError: %v\nFailed!\n", err)
+		os.Exit(1)
+	}
+	defer store.close()
+
+	if err := store.add(e); err != nil {
+		fmt.Printf("\nError: %v\nFailed!\n", err)
 		os.Exit(1)
 	}
 }
