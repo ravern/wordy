@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 
 	homedir "github.com/mitchellh/go-homedir"
 )
@@ -13,11 +15,19 @@ import (
 var (
 	errAlreadyExists = errors.New("store: word already exists")
 	errDoesntExist   = errors.New("store: word does not exist")
+	errNoData        = errors.New("entry: contains no data")
+	errInvalidData   = errors.New("entry: invalid data given")
 )
 
 type store struct {
 	file    *os.File
-	entries []*entry
+	entries []entry
+}
+
+type entry struct {
+	word string
+	desc string
+	tags []string
 }
 
 func newStore(filename string) (*store, error) {
@@ -36,26 +46,61 @@ func newStore(filename string) (*store, error) {
 	}, nil
 }
 
-func (s *store) add(e *entry) error {
+func (s *store) load() error {
+	if s.entries != nil {
+		return nil
+	}
+	s.entries = []entry{}
+
+	var (
+		scanner = bufio.NewScanner(s.file)
+		e       entry
+	)
+	for i := 0; scanner.Scan(); i++ {
+		line := scanner.Text()
+		switch i % 3 {
+		case 0:
+			e.word = line
+		case 1:
+			e.desc = line
+		case 2:
+			e.tags = strings.Split(line, ",")
+			s.entries = append(s.entries, e)
+			e = entry{}
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("store: failed to load: %v", err)
+	}
+
 	return nil
 }
 
-func (s *store) list() ([]*entry, error) {
-	return nil, nil
+func (s *store) add(e entry) error {
+	for i := range s.entries {
+		if s.entries[i].word == e.word {
+			return errAlreadyExists
+		}
+	}
+	if e.word == "" {
+		return errInvalidData
+	}
+	s.file.WriteString(e.word + "\n")
+	s.file.WriteString(e.desc + "\n")
+	s.file.WriteString(strings.Join(e.tags, ",") + "\n")
+	return nil
 }
 
-func (s *store) remove(e *entry) error {
+func (s *store) search(term string) (entry, error) {
+	return entry{}, nil
+}
+
+func (s *store) remove(e entry) error {
 	return nil
 }
 
 func (s *store) close() {
 	s.file.Close()
-}
-
-type entry struct {
-	word string
-	desc string
-	tags []string
 }
 
 const (
@@ -122,10 +167,38 @@ func (add *add) run() {
 	}
 	defer store.close()
 
+	if err := store.load(); err != nil {
+		fmt.Printf("\nError: %v\nFailed!\n", err)
+		os.Exit(1)
+	}
+
+	var (
+		e entry
+		r = bufio.NewReader(os.Stdin)
+	)
+	fmt.Print("Word: ")
+	e.word = strings.TrimSpace(readLine(r))
+	fmt.Print("Description: ")
+	e.desc = strings.TrimSpace(readLine(r))
+	fmt.Print("Tag(s): ")
+	e.tags = strings.Split(readLine(r), ",")
+	for i := range e.tags {
+		e.tags[i] = strings.TrimSpace(e.tags[i])
+	}
+
 	if err := store.add(e); err != nil {
 		fmt.Printf("\nError: %v\nFailed!\n", err)
 		os.Exit(1)
 	}
+}
+
+func readLine(r *bufio.Reader) string {
+	line, _, err := r.ReadLine()
+	if err != nil {
+		fmt.Printf("\nError: %v\nFailed!\n", err)
+		os.Exit(1)
+	}
+	return string(line)
 }
 
 type search struct {
